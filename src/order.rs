@@ -26,7 +26,10 @@ impl Order {
         Self::new(instrument, side, OrderType::Limit, Some(price), quantity)
     }
 
-    pub fn new_market(instrument: String, side: Side, quantity: Decimal) -> Self {
+    pub fn new_market(instrument: String,
+        side: Side,
+        quantity: Decimal
+    ) -> Self {
         Self::new(instrument, side, OrderType::Market, None, quantity)
     }
 
@@ -70,5 +73,106 @@ impl Order {
         } else {
             self.status = OrderStatus::PartiallyFilled;
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_limit_order_creation() {
+        let order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
+        assert!(order.order_id != Uuid::nil());
+        assert_eq!(order.instrument, "SOFI");
+        assert_eq!(order.side, Side::Buy);
+        assert_eq!(order.order_type, OrderType::Limit);
+        assert_eq!(order.status, OrderStatus::New);
+        assert_eq!(order.price, Some(dec!(29)));
+        assert_eq!(order.quantity, dec!(1));
+        assert_eq!(order.remaining_quantity, dec!(1));
+        assert!(order.timestamp > 0);
+    }
+
+    #[test]
+    fn test_limit_order_filling() {
+        let mut order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
+
+        order.fill(dec!(1));
+        assert_eq!(order.remaining_quantity, dec!(0));
+        assert_eq!(order.status, OrderStatus::Filled);
+        assert!(order.is_filled());
+    }
+
+    #[test]
+    fn test_limit_order_partially_filling() {
+        let mut order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
+        order.fill(dec!(0.4));
+        assert_eq!(order.remaining_quantity, dec!(0.6));
+        assert_eq!(order.status, OrderStatus::PartiallyFilled);
+        assert!(!order.is_filled());
+    }
+
+    #[test]
+    fn test_limit_order_partially_and_filling() {
+        let mut order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
+        order.fill(dec!(0.4));
+        assert_eq!(order.remaining_quantity, dec!(0.6));
+        assert_eq!(order.status, OrderStatus::PartiallyFilled);
+        assert!(!order.is_filled());
+
+        order.fill(dec!(0.6));
+        assert_eq!(order.remaining_quantity, dec!(0));
+        assert_eq!(order.status, OrderStatus::Filled);
+        assert!(order.is_filled());
+    }
+
+    #[test]
+    fn test_market_order_creation() {
+        let order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+        assert!(order.order_id != Uuid::nil());
+        assert_eq!(order.instrument, "NVO");
+        assert_eq!(order.side, Side::Sell);
+        assert_eq!(order.order_type, OrderType::Market);
+        assert_eq!(order.status, OrderStatus::New);
+        assert_eq!(order.price, None);
+        assert_eq!(order.quantity, dec!(2));
+        assert_eq!(order.remaining_quantity, dec!(2));
+        assert!(order.timestamp > 0);
+    }
+
+    #[test]
+    fn test_market_order_filling() {
+        let mut order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+
+        order.fill(dec!(2));
+        assert_eq!(order.remaining_quantity, dec!(0));
+        assert_eq!(order.status, OrderStatus::Filled);
+        assert!(order.is_filled());
+    }
+
+    #[test]
+    fn test_market_order_partially_filling() {
+        let mut order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+        order.fill(dec!(0.5));
+        assert_eq!(order.remaining_quantity, dec!(1.5));
+        assert_eq!(order.status, OrderStatus::PartiallyFilled);
+        assert!(!order.is_filled());
+    }
+
+    #[test]
+    fn test_market_order_partially_and_filling() {
+        let mut order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+        order.fill(dec!(0.5));
+        assert_eq!(order.remaining_quantity, dec!(1.5));
+        assert_eq!(order.status, OrderStatus::PartiallyFilled);
+        assert!(!order.is_filled());
+
+        order.fill(dec!(1.5));
+        assert_eq!(order.remaining_quantity, dec!(0));
+        assert_eq!(order.status, OrderStatus::Filled);
+        assert!(order.is_filled());
     }
 }

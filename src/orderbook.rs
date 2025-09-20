@@ -195,3 +195,162 @@ impl OrderBook {
         OrderBookDisplay { bids, asks }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+    fn setup_book() -> OrderBook {
+        OrderBook::new("TEST-STOCK".to_string())
+    }
+
+    #[test]
+    fn test_new_order_book_is_empty() {
+        let book = setup_book();
+        assert_eq!(book.instrument, "TEST-STOCK");
+        assert!(book.bids.is_empty());
+        assert!(book.asks.is_empty());
+        assert!(book.orders.is_empty());
+    }
+
+    #[test]
+    fn test_add_single_buy_order() {
+        let mut book = setup_book();
+        let order = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(10));
+        let order_id = order.order_id;
+
+        let trades = book.add_order(order);
+
+        assert!(trades.is_empty());
+        assert_eq!(book.orders.len(), 1);
+        assert_eq!(book.bids.len(), 1);
+        assert!(book.asks.is_empty());
+        assert!(book.orders.contains_key(&order_id));
+        assert_eq!(book.bids.get(&dec!(150.0)).unwrap().front().unwrap(), &order_id);
+    }
+
+    #[test]
+    fn test_add_multiple_orders_at_same_price_level() {
+        let mut book = setup_book();
+        let order1 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(10));
+        let order2 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(5));
+        let order1_id = order1.order_id;
+        let order2_id = order2.order_id;
+
+        book.add_order(order1);
+        book.add_order(order2);
+
+        assert_eq!(book.orders.len(), 2);
+        assert_eq!(book.bids.len(), 1);
+        
+        let price_level_queue = book.bids.get(&dec!(150.0)).unwrap();
+        assert_eq!(price_level_queue.len(), 2);
+        assert_eq!(price_level_queue.get(0).unwrap(), &order1_id);
+        assert_eq!(price_level_queue.get(1).unwrap(), &order2_id);
+    }
+
+    #[test]
+    fn test_cancel_order() {
+        let mut book = setup_book();
+        let order = Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(200.0), dec!(5));
+        let order_id = order.order_id;
+        book.add_order(order);
+        assert!(!book.orders.is_empty());
+        assert!(!book.asks.is_empty());
+
+        let result = book.cancel_order(&order_id);
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().order_id, order_id);
+        assert!(book.orders.is_empty());
+        assert!(book.asks.is_empty());
+    }
+    
+    #[test]
+    fn test_cancel_order_from_level_with_multiple_orders() {
+        let mut book = setup_book();
+        let order1 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(10));
+        let order2 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(5));
+        let order1_id = order1.order_id;
+        let order2_id = order2.order_id;
+        book.add_order(order1);
+        book.add_order(order2);
+
+        let result = book.cancel_order(&order1_id);
+
+        assert!(result.is_ok());
+        assert_eq!(book.orders.len(), 1);
+        assert_eq!(book.bids.len(), 1);
+
+        let price_level_queue = book.bids.get(&dec!(100.0)).unwrap();
+        assert_eq!(price_level_queue.len(), 1);
+        assert_eq!(price_level_queue.front().unwrap(), &order2_id);
+    }
+
+    #[test]
+    fn test_cancel_non_existent_order_returns_err() {
+        let mut book = setup_book();
+        let non_existent_id = Uuid::new_v4();
+
+        let result = book.cancel_order(&non_existent_id);
+
+        assert!(result.is_err());
+        matches!(result.unwrap_err(), MatchingEngineError::OrderNotFound(id) if id == non_existent_id);
+    }
+    
+    #[test]
+    fn test_get_matchable_prices_for_buy_limit_order() {
+        let mut book = setup_book();
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(101.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(102.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(103.0), dec!(10)));
+
+        let incoming_order = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(102.0), dec!(5));
+
+        let prices = book.get_matchable_prices(&incoming_order);
+
+        assert_eq!(prices, vec![dec!(101.0), dec!(102.0)]);
+    }
+
+    #[test]
+    fn test_get_matchable_prices_for_sell_limit_order() {
+        let mut book = setup_book();
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(99.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(101.0), dec!(10)));
+
+        let incoming_order = Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(100.0), dec!(5));
+
+        let prices = book.get_matchable_prices(&incoming_order);
+
+        assert_eq!(prices, vec![dec!(101.0), dec!(100.0)]);
+    }
+
+    #[test]
+    fn test_get_matchable_prices_for_buy_market_order() {
+        let mut book = setup_book();
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(101.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(102.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(103.0), dec!(10)));
+
+        let incoming_order = Order::new_market("TEST-STOCK".to_string(), Side::Buy, dec!(5));
+
+        let prices = book.get_matchable_prices(&incoming_order);
+
+        assert_eq!(prices, vec![dec!(101.0), dec!(102.0), dec!(103.0)]);
+    }
+
+    #[test]
+    fn test_get_matchable_prices_for_sell_market_order() {
+        let mut book = setup_book();
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(98.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(99.0), dec!(10)));
+        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(97.0), dec!(10)));
+
+        let incoming_order = Order::new_market("TEST-STOCK".to_string(), Side::Sell, dec!(5));
+
+        let prices = book.get_matchable_prices(&incoming_order);
+
+        assert_eq!(prices, vec![dec!(99.0), dec!(98.0), dec!(97.0)]);
+    }
+}

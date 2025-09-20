@@ -3,31 +3,22 @@ use exchange_matching_engine::order::Order;
 use exchange_matching_engine::utils::{Side, format_timestamp};
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::error::Error;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 struct Operation {
-    #[serde(rename = "TYPE")]
-    op_type: String,
-    #[serde(rename = "INSTRUMENT")]
+    operation: String,
     instrument: String,
-    #[serde(rename = "SIDE")]
     side: Option<String>,
-    #[serde(rename = "ORDER_TYPE")]
     order_type: Option<String>,
-    #[serde(rename = "PRICE")]
-    price: Option<Decimal>,
-    #[serde(rename = "QUANTITY")]
     quantity: Option<Decimal>,
-    #[serde(rename = "LABEL")]
-    label: Option<String>,
+    price: Option<Decimal>,
+    order_to_cancel: Option<String>,
 }
 
 fn run_simulation() -> Result<(), Box<dyn Error>> {
     let mut engine = MatchingEngine::new();
-    let mut order_ids: HashMap<String, Uuid> = HashMap::new();
 
     println!("Starting trading simulation from operations.csv");
 
@@ -41,18 +32,18 @@ fn run_simulation() -> Result<(), Box<dyn Error>> {
             println!("Market created for {}", operation.instrument);
         }
 
-        match operation.op_type.as_str() {
-            "ADD" => {
+        match operation.operation.as_str() {
+            "NEW" => {
                 let side = match operation.side.as_deref() {
                     Some("BUY") => Side::Buy,
                     Some("SELL") => Side::Sell,
                     _ => {
-                        eprintln!(" -> Error: ADD operation requires a valid SIDE.");
+                        eprintln!(" -> Error: NEW operation requires a valid SIDE.");
                         continue;
                     }
                 };
                 
-                let order = match operation.order_type.as_deref() {
+                let mut order = match operation.order_type.as_deref() {
                     Some("LIMIT") => Order::new_limit(
                         operation.instrument.clone(),
                         side,
@@ -65,10 +56,23 @@ fn run_simulation() -> Result<(), Box<dyn Error>> {
                         operation.quantity.unwrap_or_default(),
                     ),
                     _ => {
-                        eprintln!(" -> Error: ADD operation requires a valid ORDER_TYPE.");
+                        eprintln!(" -> Error: NEW operation requires a valid ORDER_TYPE.");
                         continue;
                     }
                 };
+
+                if let Some(id_str) = operation.order_to_cancel.as_ref() {
+                    match Uuid::parse_str(id_str) {
+                        Ok(id) => order.order_id = id,
+                        Err(_) => {
+                            eprintln!(" -> Error: Invalid UUID format for new order: '{}'", id_str);
+                            continue;
+                        }
+                    }
+                } else {
+                    eprintln!(" -> Error: NEW operation requires an ID in the 'order_to_cancel' column.");
+                    continue;
+                }
 
                 println!(
                     " ts: {} | Submitting Order: [ID: {}, Side: {:?}, Type: {:?}, Qty: {}, Price: {}]",
@@ -79,16 +83,13 @@ fn run_simulation() -> Result<(), Box<dyn Error>> {
                     order.quantity,
                     order.price.unwrap_or_default(),
                 );
-
-                if let Some(label) = operation.label.as_ref() {
-                    order_ids.insert(label.clone(), order.order_id);
-                }
+ 
 
                 match engine.process_order(order) {
                     Ok(trades) if !trades.is_empty() => {
                         println!(" Trades Executed!");
                         for trade in trades {
-                             println!(" -> Trade: Price: {}, Qty: {}", trade.price, trade.quantity);
+                            println!(" -> Trade: Price: {}, Qty: {}", trade.price, trade.quantity);
                         }
                     },
                     Ok(_) => println!("Order rested on book, no trades."),
@@ -96,22 +97,22 @@ fn run_simulation() -> Result<(), Box<dyn Error>> {
                 }
             }
             "CANCEL" => {
-                if let Some(label) = operation.label.as_ref() {
-                    if let Some(order_id) = order_ids.get(label) {
-                         println!("Attempting to cancel order labeled '{}' (ID: {})", label, order_id);
-                         match engine.cancel_order_by_id(order_id, &operation.instrument) {
+                if let Some(id_str_to_cancel) = operation.order_to_cancel.as_ref() {
+                    if let Ok(order_id) = Uuid::parse_str(id_str_to_cancel) {
+                        println!("Attempting to cancel order ID: {}", order_id);
+                        match engine.cancel_order_by_id(&order_id, &operation.instrument) {
                             Ok(canceled_order) => println!("Order {} canceled successfully.", canceled_order.order_id),
                             Err(e) => println!("Failed to cancel order {}: {}", order_id, e),
                         }
                     } else {
-                         eprintln!(" -> Error: No order found with label '{}' to cancel.", label);
+                        eprintln!(" -> Error: Invalid UUID format for order to cancel: '{}'", id_str_to_cancel);
                     }
                 } else {
-                     eprintln!(" -> Error: CANCEL operation requires a LABEL.");
+                    eprintln!(" -> Error: CANCEL operation requires an ID in the 'order_to_cancel' column.");
                 }
             }
             _ => {
-                eprintln!(" -> Error: Unknown operation type '{}'", operation.op_type);
+                eprintln!(" -> Error: Unknown operation type '{}'", operation.operation);
             }
         }
         
@@ -144,8 +145,6 @@ fn run_simulation() -> Result<(), Box<dyn Error>> {
     println!("\n\nSimulation finished.");
     Ok(())
 }
-
-
 fn main() {
     if let Err(e) = run_simulation() {
         eprintln!("Application error: {}", e);

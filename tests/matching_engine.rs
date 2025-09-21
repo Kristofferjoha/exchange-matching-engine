@@ -13,7 +13,7 @@ fn setup() -> MatchingEngine {
 #[test]
 fn test_add_non_matching_limit_order() {
     let mut engine = setup();
-    let order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(100.0), dec!(10));
+    let order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(100.0), dec!(10));
 
     let trades = engine.process_order(order).unwrap();
     assert!(trades.is_empty());
@@ -29,10 +29,10 @@ fn test_add_non_matching_limit_order() {
 fn test_simple_full_match() {
     let mut engine = setup();
     
-    let sell_order = Order::new_limit("SOFI".to_string(), Side::Sell, dec!(102.5), dec!(5));
+    let sell_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(102.5), dec!(5));
     engine.process_order(sell_order).unwrap();
 
-    let buy_order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(102.5), dec!(5));
+    let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(102.5), dec!(5));
     let trades = engine.process_order(buy_order).unwrap();
 
     assert_eq!(trades.len(), 1);
@@ -48,10 +48,10 @@ fn test_simple_full_match() {
 fn test_partial_match() {
     let mut engine = setup();
 
-    let sell_order = Order::new_limit("SOFI".to_string(), Side::Sell, dec!(200.0), dec!(10));
+    let sell_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(200.0), dec!(10));
     engine.process_order(sell_order).unwrap();
 
-    let buy_order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(200.0), dec!(3));
+    let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(200.0), dec!(3));
     let trades = engine.process_order(buy_order).unwrap();
 
     assert_eq!(trades.len(), 1);
@@ -67,10 +67,10 @@ fn test_partial_match() {
 fn test_match_across_multiple_price_levels() {
     let mut engine = setup();
 
-    engine.process_order(Order::new_limit("SOFI".to_string(), Side::Sell, dec!(102.0), dec!(10))).unwrap();
-    engine.process_order(Order::new_limit("SOFI".to_string(), Side::Sell, dec!(101.0), dec!(5))).unwrap();
+    engine.process_order(Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(102.0), dec!(10))).unwrap();
+    engine.process_order(Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(101.0), dec!(5))).unwrap();
 
-    let buy_order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(103.0), dec!(12));
+    let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(103.0), dec!(12));
     let trades = engine.process_order(buy_order).unwrap();
 
     assert_eq!(trades.len(), 2);
@@ -91,14 +91,14 @@ fn test_match_across_multiple_price_levels() {
 fn test_price_time_priority_fifo() {
     let mut engine = setup();
 
-    let sell_order_first = Order::new_limit("SOFI".to_string(), Side::Sell, dec!(100.0), dec!(5));
+    let sell_order_first = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(100.0), dec!(5));
     let first_order_id = sell_order_first.order_id;
     engine.process_order(sell_order_first).unwrap();
 
-    let sell_order_second = Order::new_limit("SOFI".to_string(), Side::Sell, dec!(100.0), dec!(5));
+    let sell_order_second = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(100.0), dec!(5));
     engine.process_order(sell_order_second).unwrap();
 
-    let buy_order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(100.0), dec!(5));
+    let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(100.0), dec!(5));
     let trades = engine.process_order(buy_order).unwrap();
 
     assert_eq!(trades.len(), 1);
@@ -116,10 +116,10 @@ fn test_price_time_priority_fifo() {
 fn test_cancel_partially_filled_order() {
     let mut engine = setup();
 
-    let sell_order = Order::new_limit("SOFI".to_string(), Side::Sell, dec!(200.0), dec!(10));
+    let sell_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(200.0), dec!(10));
     let sell_order_id = sell_order.order_id;
     engine.process_order(sell_order).unwrap();
-    engine.process_order(Order::new_limit("SOFI".to_string(), Side::Buy, dec!(200.0), dec!(4))).unwrap();
+    engine.process_order(Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(200.0), dec!(4))).unwrap();
 
     let result = engine.cancel_order_by_id(&sell_order_id, "SOFI");
     
@@ -144,9 +144,9 @@ fn test_cancel_non_existent_order() {
 fn test_market_order_insufficient_liquidity() {
     let mut engine = setup();
     
-    engine.process_order(Order::new_limit("SOFI".to_string(), Side::Sell, dec!(100.0), dec!(5))).unwrap();
+    engine.process_order(Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(100.0), dec!(5))).unwrap();
 
-    let market_buy = Order::new_market("SOFI".to_string(), Side::Buy, dec!(10));
+    let market_buy = Order::new_market(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(10));
     let trades = engine.process_order(market_buy).unwrap();
     
     assert_eq!(trades.len(), 1);
@@ -160,7 +160,7 @@ fn test_market_order_insufficient_liquidity() {
 #[test]
 fn test_process_order_for_unknown_market() {
     let mut engine = MatchingEngine::new();
-    let order = Order::new_limit("UNKNOWN".to_string(), Side::Buy, dec!(10.0), dec!(1));
+    let order = Order::new_limit(Uuid::new_v4(), "UNKNOWN".to_string(), Side::Buy, dec!(10.0), dec!(1));
 
     let result = engine.process_order(order);
 

@@ -200,6 +200,8 @@ impl OrderBook {
 mod tests {
     use super::*;
     use rust_decimal_macros::dec;
+    use uuid::Uuid;
+
     fn setup_book() -> OrderBook {
         OrderBook::new("TEST-STOCK".to_string())
     }
@@ -216,7 +218,7 @@ mod tests {
     #[test]
     fn test_add_single_buy_order() {
         let mut book = setup_book();
-        let order = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(10));
+        let order = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(10));
         let order_id = order.order_id;
 
         let trades = book.add_order(order);
@@ -232,8 +234,8 @@ mod tests {
     #[test]
     fn test_add_multiple_orders_at_same_price_level() {
         let mut book = setup_book();
-        let order1 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(10));
-        let order2 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(5));
+        let order1 = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(10));
+        let order2 = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(150.0), dec!(5));
         let order1_id = order1.order_id;
         let order2_id = order2.order_id;
 
@@ -252,7 +254,7 @@ mod tests {
     #[test]
     fn test_cancel_order() {
         let mut book = setup_book();
-        let order = Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(200.0), dec!(5));
+        let order = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(200.0), dec!(5));
         let order_id = order.order_id;
         book.add_order(order);
         assert!(!book.orders.is_empty());
@@ -269,8 +271,8 @@ mod tests {
     #[test]
     fn test_cancel_order_from_level_with_multiple_orders() {
         let mut book = setup_book();
-        let order1 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(10));
-        let order2 = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(5));
+        let order1 = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(10));
+        let order2 = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(5));
         let order1_id = order1.order_id;
         let order2_id = order2.order_id;
         book.add_order(order1);
@@ -301,11 +303,12 @@ mod tests {
     #[test]
     fn test_get_matchable_prices_for_buy_limit_order() {
         let mut book = setup_book();
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(101.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(102.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(103.0), dec!(10)));
 
-        let incoming_order = Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(102.0), dec!(5));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(101.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(102.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(103.0), dec!(10)));
+
+        let incoming_order = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(102.0), dec!(5));
 
         let prices = book.get_matchable_prices(&incoming_order);
 
@@ -315,11 +318,11 @@ mod tests {
     #[test]
     fn test_get_matchable_prices_for_sell_limit_order() {
         let mut book = setup_book();
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(99.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(101.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(99.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(100.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(101.0), dec!(10)));
 
-        let incoming_order = Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(100.0), dec!(5));
+        let incoming_order = Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(100.0), dec!(5));
 
         let prices = book.get_matchable_prices(&incoming_order);
 
@@ -329,11 +332,11 @@ mod tests {
     #[test]
     fn test_get_matchable_prices_for_buy_market_order() {
         let mut book = setup_book();
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(101.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(102.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Sell, dec!(103.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(101.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(102.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(103.0), dec!(10)));
 
-        let incoming_order = Order::new_market("TEST-STOCK".to_string(), Side::Buy, dec!(5));
+        let incoming_order = Order::new_market(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(5));
 
         let prices = book.get_matchable_prices(&incoming_order);
 
@@ -343,11 +346,11 @@ mod tests {
     #[test]
     fn test_get_matchable_prices_for_sell_market_order() {
         let mut book = setup_book();
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(98.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(99.0), dec!(10)));
-        book.add_order(Order::new_limit("TEST-STOCK".to_string(), Side::Buy, dec!(97.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(98.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(99.0), dec!(10)));
+        book.add_order(Order::new_limit(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Buy, dec!(97.0), dec!(10)));
 
-        let incoming_order = Order::new_market("TEST-STOCK".to_string(), Side::Sell, dec!(5));
+        let incoming_order = Order::new_market(Uuid::new_v4(), "TEST-STOCK".to_string(), Side::Sell, dec!(5));
 
         let prices = book.get_matchable_prices(&incoming_order);
 

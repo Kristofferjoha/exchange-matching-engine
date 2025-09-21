@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             OpType::Cancel => {
                 if !open_limit_orders.is_empty() {
-                    let index_to_cancel = rng.random_range(0..open_limit_orders.len());
+                    let index_to_cancel = rng.random_range(open_limit_orders.len()-10..open_limit_orders.len());
                     let order_id_to_cancel = open_limit_orders.remove(index_to_cancel);
                     wtr.write_record(&["CANCEL", INSTRUMENT, "", "", "", "", &order_id_to_cancel.to_string()])?;
                 }

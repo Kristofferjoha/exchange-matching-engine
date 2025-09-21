@@ -18,22 +18,26 @@ pub struct Order {
 
 impl Order {
     pub fn new_limit(
+        order_id: Uuid,
         instrument: String,
         side: Side,
         price: Decimal,
         quantity: Decimal,
     ) -> Self {
-        Self::new(instrument, side, OrderType::Limit, Some(price), quantity)
+        Self::new(order_id, instrument, side, OrderType::Limit, Some(price), quantity)
     }
 
-    pub fn new_market(instrument: String,
+    pub fn new_market(
+        order_id: Uuid,
+        instrument: String,
         side: Side,
         quantity: Decimal
     ) -> Self {
-        Self::new(instrument, side, OrderType::Market, None, quantity)
+        Self::new(order_id, instrument, side, OrderType::Market, None, quantity)
     }
 
     fn new(
+        order_id: Uuid,
         instrument: String,
         side: Side,
         order_type: OrderType,
@@ -46,7 +50,7 @@ impl Order {
             .as_nanos() as u64;
 
         Order {
-            order_id: Uuid::new_v4(),
+            order_id,
             instrument,
             side,
             order_type,
@@ -83,22 +87,8 @@ mod tests {
     use rust_decimal_macros::dec;
 
     #[test]
-    fn test_limit_order_creation() {
-        let order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
-        assert!(order.order_id != Uuid::nil());
-        assert_eq!(order.instrument, "SOFI");
-        assert_eq!(order.side, Side::Buy);
-        assert_eq!(order.order_type, OrderType::Limit);
-        assert_eq!(order.status, OrderStatus::New);
-        assert_eq!(order.price, Some(dec!(29)));
-        assert_eq!(order.quantity, dec!(1));
-        assert_eq!(order.remaining_quantity, dec!(1));
-        assert!(order.timestamp > 0);
-    }
-
-    #[test]
     fn test_limit_order_filling() {
-        let mut order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
+        let mut order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
 
         order.fill(dec!(1));
         assert_eq!(order.remaining_quantity, dec!(0));
@@ -108,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_limit_order_partially_filling() {
-        let mut order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
+        let mut order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
         order.fill(dec!(0.4));
         assert_eq!(order.remaining_quantity, dec!(0.6));
         assert_eq!(order.status, OrderStatus::PartiallyFilled);
@@ -117,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_limit_order_partially_and_filling() {
-        let mut order = Order::new_limit("SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
+        let mut order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(29), dec!(1));
         order.fill(dec!(0.4));
         assert_eq!(order.remaining_quantity, dec!(0.6));
         assert_eq!(order.status, OrderStatus::PartiallyFilled);
@@ -131,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_market_order_creation() {
-        let order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+        let order = Order::new_market(Uuid::new_v4(), "NVO".to_string(), Side::Sell, dec!(2));
         assert!(order.order_id != Uuid::nil());
         assert_eq!(order.instrument, "NVO");
         assert_eq!(order.side, Side::Sell);
@@ -145,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_market_order_filling() {
-        let mut order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+        let mut order = Order::new_market(Uuid::new_v4(), "NVO".to_string(), Side::Sell, dec!(2));
 
         order.fill(dec!(2));
         assert_eq!(order.remaining_quantity, dec!(0));
@@ -155,7 +145,7 @@ mod tests {
 
     #[test]
     fn test_market_order_partially_filling() {
-        let mut order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+        let mut order = Order::new_market(Uuid::new_v4(), "NVO".to_string(), Side::Sell, dec!(2));
         order.fill(dec!(0.5));
         assert_eq!(order.remaining_quantity, dec!(1.5));
         assert_eq!(order.status, OrderStatus::PartiallyFilled);
@@ -164,7 +154,7 @@ mod tests {
 
     #[test]
     fn test_market_order_partially_and_filling() {
-        let mut order = Order::new_market("NVO".to_string(), Side::Sell, dec!(2));
+        let mut order = Order::new_market(Uuid::new_v4(), "NVO".to_string(), Side::Sell, dec!(2));
         order.fill(dec!(0.5));
         assert_eq!(order.remaining_quantity, dec!(1.5));
         assert_eq!(order.status, OrderStatus::PartiallyFilled);

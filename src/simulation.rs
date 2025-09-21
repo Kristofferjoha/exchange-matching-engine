@@ -5,6 +5,7 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::error::Error;
 use uuid::Uuid;
+use crate::logging::LoggingStrategy;
 
 
 #[derive(Debug, Deserialize)]
@@ -18,11 +19,11 @@ struct Operation {
     order_to_cancel: Option<String>,
 }
 
-pub fn run_simulation(naive: bool) -> Result<(), Box<dyn Error>> {
+pub fn run_simulation(strategy: LoggingStrategy) -> Result<(), Box<dyn Error>> {
     let mut engine = MatchingEngine::new();
     let mut instruments = Vec::new();
 
-    if naive {
+    if strategy == LoggingStrategy::Naive {
         println!("Starting trading simulation from operations.csv (Verbose Mode)");
     }
 
@@ -34,7 +35,7 @@ pub fn run_simulation(naive: bool) -> Result<(), Box<dyn Error>> {
         if !engine.has_market(&operation.instrument) {
             engine.add_market(operation.instrument.clone());
             instruments.push(operation.instrument.clone());
-            if naive {
+            if strategy == LoggingStrategy::Naive {
                 println!("Market created for {}", operation.instrument);
             }
         }
@@ -88,7 +89,7 @@ pub fn run_simulation(naive: bool) -> Result<(), Box<dyn Error>> {
                     continue;
                 }
 
-                if naive {
+                if strategy == LoggingStrategy::Naive {
                     println!(
                         " ts: {} | Submitting Order: [ID: {}, Side: {:?}, Type: {:?}, Qty: {}, Price: {}]",
                         format_timestamp(order.timestamp),
@@ -102,7 +103,7 @@ pub fn run_simulation(naive: bool) -> Result<(), Box<dyn Error>> {
 
                 match engine.process_order(order) {
                     Ok(trades) if !trades.is_empty() => {
-                        if naive {
+                        if strategy == LoggingStrategy::Naive {
                             println!(" Trades Executed!");
                             for trade in trades {
                                 println!("{}", trade);
@@ -110,7 +111,7 @@ pub fn run_simulation(naive: bool) -> Result<(), Box<dyn Error>> {
                         }
                     },
                     Ok(_) => {
-                        if naive {
+                        if strategy == LoggingStrategy::Naive {
                              println!("Order rested on book, no trades.");
                         }
                     },
@@ -120,12 +121,12 @@ pub fn run_simulation(naive: bool) -> Result<(), Box<dyn Error>> {
             "CANCEL" => {
                 if let Some(id_str_to_cancel) = operation.order_to_cancel.as_ref() {
                     if let Ok(order_id) = Uuid::parse_str(id_str_to_cancel) {
-                        if naive {
+                        if strategy == LoggingStrategy::Naive {
                             println!("Attempting to cancel order ID: {}", order_id);
                         }
                         match engine.cancel_order_by_id(&order_id, &operation.instrument) {
                             Ok(canceled_order) => {
-                                if naive {
+                                if strategy == LoggingStrategy::Naive {
                                     println!(" -> Order {} canceled successfully.", canceled_order.order_id)
                                 }
                             },
@@ -134,7 +135,7 @@ pub fn run_simulation(naive: bool) -> Result<(), Box<dyn Error>> {
                                 // We now check *why* the cancel failed.
                                 match e {
                                     MatchingEngineError::OrderNotFound(_) => {
-                                        if naive {
+                                        if strategy == LoggingStrategy::Naive {
                                             println!(" -> Cancel rejected for order {}: not found (likely already filled).", order_id);
                                         }
                                     },

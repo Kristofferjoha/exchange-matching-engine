@@ -11,7 +11,7 @@ const INSTRUMENT: &str = "PUMPTHIS";
 const TOTAL_OPERATIONS: usize = 100_000;
 const BOOK_BUILD_OPS: usize = 3_000;
 const MID_PRICE: Decimal = dec!(100);
-const SPREAD: Decimal = dec!(0.5);
+const SPREAD: Decimal = dec!(0.0);
 const TICK_SIZE: Decimal = dec!(0.05);
 
 #[derive(Clone, Copy)]
@@ -22,9 +22,9 @@ enum OpType {
 }
 
 const OP_WEIGHTS: &[(OpType, f64)] = &[
-    (OpType::NewLimit, 0.55),
+    (OpType::NewLimit, 0.60),
     (OpType::NewMarket, 0.15),
-    (OpType::Cancel, 0.30),
+    (OpType::Cancel, 0.25),
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             OpType::NewMarket => {
                 let side = if rng.random_range(0..=1) == 1 { "BUY" } else { "SELL" };
-                let quantity_int = rng.random_range(50..=500); 
+                let quantity_int = rng.random_range(50..=250); 
                 let quantity = Decimal::from(quantity_int);
                 let new_order_id = Uuid::new_v4();
                 wtr.write_record(&[
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             OpType::Cancel => {
                 if !open_limit_orders.is_empty() {
-                    let index_to_cancel = rng.random_range(open_limit_orders.len()-10..open_limit_orders.len());
+                    let index_to_cancel = rng.random_range(open_limit_orders.len()-20..open_limit_orders.len());
                     let order_id_to_cancel = open_limit_orders.remove(index_to_cancel);
                     wtr.write_record(&["CANCEL", INSTRUMENT, "", "", "", "", &order_id_to_cancel.to_string()])?;
                 }

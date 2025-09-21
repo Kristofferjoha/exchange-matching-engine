@@ -1,11 +1,12 @@
-use crate::engine::MatchingEngine;
+use crate::engine::{MatchingEngine};
 use crate::order::Order;
-use crate::utils::{Side, format_timestamp, MatchingEngineError};
+use crate::utils::{Side};
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::error::Error;
 use uuid::Uuid;
-use crate::logging::LoggingStrategy;
+use crate::logging::utils::SimLogger;
+
 
 
 #[derive(Debug, Deserialize)]
@@ -19,36 +20,24 @@ struct Operation {
     order_to_cancel: Option<String>,
 }
 
-pub fn run_simulation(strategy: LoggingStrategy) -> Result<(), Box<dyn Error>> {
-    let mut engine = MatchingEngine::new();
-    let mut instruments = Vec::new();
-
-    if strategy == LoggingStrategy::Naive {
-        println!("Starting trading simulation from operations.csv (Verbose Mode)");
-    }
-
+pub fn run_simulation(logger: &mut Box<dyn SimLogger>, engine: &mut MatchingEngine) -> Result<(), Box<dyn Error>> {
     let mut reader = csv::Reader::from_path("operations.csv")?;
 
     for result in reader.deserialize() {
         let operation: Operation = result?;
 
-        if !engine.has_market(&operation.instrument) {
-            engine.add_market(operation.instrument.clone());
-            instruments.push(operation.instrument.clone());
-            if strategy == LoggingStrategy::Naive {
-                println!("Market created for {}", operation.instrument);
-            }
-        }
-
         match operation.operation.as_str() {
             "NEW" => {
-                let order_id = match operation.order_to_cancel.as_ref().and_then(|id_str| Uuid::parse_str(id_str).ok()) {
-                    Some(id) => id,
-                    None => {
-                        eprintln!(" -> Error: NEW operation requires a valid UUID in the 'order_to_cancel' column.");
-                        continue;
-                    }
+                let Some(id_str) = operation.order_to_cancel.as_ref() else {
+                    eprintln!(" -> Error: NEW operation requires an ID in the 'order_to_cancel' column.");
+                    continue;
                 };
+
+                let Ok(order_id) = Uuid::parse_str(id_str) else {
+                    eprintln!(" -> Error: Invalid UUID format for new order: '{}'", id_str);
+                    continue;
+                };
+
                 let side = match operation.side.as_deref() {
                     Some("BUY") => Side::Buy,
                     Some("SELL") => Side::Sell,
@@ -58,14 +47,22 @@ pub fn run_simulation(strategy: LoggingStrategy) -> Result<(), Box<dyn Error>> {
                     }
                 };
                 
-                let mut order = match operation.order_type.as_deref() {
-                    Some("LIMIT") => Order::new_limit(order_id,
-                        operation.instrument.clone(),
-                        side,
-                        operation.price.unwrap_or_default(),
-                        operation.quantity.unwrap_or_default(),
-                    ),
-                    Some("MARKET") => Order::new_market(order_id,
+                let order = match operation.order_type.as_deref() {
+                    Some("LIMIT") => {
+                        let Some(price) = operation.price else {
+                            eprintln!(" -> Error: LIMIT order requires a valid PRICE.");
+                            continue;
+                        };
+                        Order::new_limit(
+                            order_id,
+                            operation.instrument.clone(),
+                            side,
+                            price,
+                            operation.quantity.unwrap_or_default(),
+                        )
+                    },
+                    Some("MARKET") => Order::new_market(
+                        order_id,
                         operation.instrument.clone(),
                         side,
                         operation.quantity.unwrap_or_default(),
@@ -76,82 +73,28 @@ pub fn run_simulation(strategy: LoggingStrategy) -> Result<(), Box<dyn Error>> {
                     }
                 };
 
-                if let Some(id_str) = operation.order_to_cancel.as_ref() {
-                    match Uuid::parse_str(id_str) {
-                        Ok(id) => order.order_id = id,
-                        Err(_) => {
-                            eprintln!(" -> Error: Invalid UUID format for new order: '{}'", id_str);
-                            continue;
-                        }
-                    }
-                } else {
-                    eprintln!(" -> Error: NEW operation requires an ID in the 'order_to_cancel' column.");
-                    continue;
-                }
+                logger.log_order_submission(&order);
 
-                if strategy == LoggingStrategy::Naive {
-                    println!(
-                        " ts: {} | Submitting Order: [ID: {}, Side: {:?}, Type: {:?}, Qty: {}, Price: {}]",
-                        format_timestamp(order.timestamp),
-                        order.order_id,
-                        order.side,
-                        order.order_type,
-                        order.quantity,
-                        order.price.unwrap_or_default(),
-                    );
-                }
-
-                match engine.process_order(order) {
-                    Ok(trades) if !trades.is_empty() => {
-                        if strategy == LoggingStrategy::Naive {
-                            println!(" Trades Executed!");
-                            for trade in trades {
-                                println!("{}", trade);
-                            }
-                        }
-                    },
+                match engine.process_order(order, logger) {
                     Ok(_) => {
-                        if strategy == LoggingStrategy::Naive {
-                             println!("Order rested on book, no trades.");
-                        }
-                    },
+                    }
                     Err(e) => eprintln!(" -> Error processing order: {}", e),
                 }
             }
             "CANCEL" => {
-                if let Some(id_str_to_cancel) = operation.order_to_cancel.as_ref() {
-                    if let Ok(order_id) = Uuid::parse_str(id_str_to_cancel) {
-                        if strategy == LoggingStrategy::Naive {
-                            println!("Attempting to cancel order ID: {}", order_id);
-                        }
-                        match engine.cancel_order_by_id(&order_id, &operation.instrument) {
-                            Ok(canceled_order) => {
-                                if strategy == LoggingStrategy::Naive {
-                                    println!(" -> Order {} canceled successfully.", canceled_order.order_id)
-                                }
-                            },
-                            Err(e) => {
-                                // This is the updated block.
-                                // We now check *why* the cancel failed.
-                                match e {
-                                    MatchingEngineError::OrderNotFound(_) => {
-                                        if strategy == LoggingStrategy::Naive {
-                                            println!(" -> Cancel rejected for order {}: not found (likely already filled).", order_id);
-                                        }
-                                    },
-                                    _ => {
-                                        // For any other type of error, print it as a real failure.
-                                        println!(" -> Failed to cancel order {}: {}", order_id, e);
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        eprintln!(" -> Error: Invalid UUID format for order to cancel: '{}'", id_str_to_cancel);
-                    }
-                } else {
+                let Some(id_str_to_cancel) = operation.order_to_cancel.as_ref() else {
                     eprintln!(" -> Error: CANCEL operation requires an ID in the 'order_to_cancel' column.");
-                }
+                    continue;
+                };
+
+                let Ok(order_id) = Uuid::parse_str(id_str_to_cancel) else {
+                    eprintln!(" -> Error: Invalid UUID format for order to cancel: '{}'", id_str_to_cancel);
+                    continue;
+                };
+
+                let success = engine.cancel_order_by_id(&order_id, &operation.instrument).is_ok();
+                
+                logger.log_order_cancel(&order_id, success);
             }
             _ => {
                 eprintln!(" -> Error: Unknown operation type '{}'", operation.operation);
@@ -159,34 +102,6 @@ pub fn run_simulation(strategy: LoggingStrategy) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("\n--- FINAL ORDER BOOKS ---");
-    for instrument in &instruments {
-        if let Some(display) = engine.get_order_book_display(instrument) {
-            println!("\n--- ORDER BOOK: {} ---", instrument);
-            
-            println!("  ASKS (Sell Orders):");
-            if display.asks.is_empty() {
-                println!("    (empty)");
-            } else {
-                for level in &display.asks {
-                    println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
-                }
-            }
-            
-            println!("  ---------------------------");
-
-            println!("  BIDS (Buy Orders):");
-            if display.bids.is_empty() {
-                println!("    (empty)");
-            } else {
-                for level in &display.bids {
-                    println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
-                }
-            }
-            println!("-----------------------------");
-        }
-    }
-
-    println!("\nSimulation finished.");
+    println!("\nFinished processing simulation operations.");
     Ok(())
 }

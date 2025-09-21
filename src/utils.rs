@@ -1,6 +1,7 @@
 use rust_decimal::Decimal;
 use thiserror::Error;
-use chrono::{DateTime, Local};
+use crate::engine::MatchingEngine;
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
@@ -25,7 +26,7 @@ pub enum OrderStatus {
 #[derive(Error, Debug)]
 pub enum MatchingEngineError {
     #[error("Market for instrument '{0}' does not exist")]
-    MarketNotFound(String),
+    MarketNotFound(String), 
     #[error("Order ID '{0}' not found")]
     OrderNotFound(uuid::Uuid),
     #[error("Invalid order price: Market orders cannot have a price, and limit orders must")]
@@ -44,13 +45,32 @@ pub struct OrderBookDisplay {
     pub asks: Vec<PriceLevel>,
 }
 
-pub fn format_timestamp(ts: u64) -> String {
-    let utc_dt = DateTime::from_timestamp(
-        (ts / 1_000_000_000) as i64,
-        (ts % 1_000_000_000) as u32,
-    ).unwrap();
+pub fn display_final_matching_engine(instruments: &[String], engine: &MatchingEngine) {
+    println!("\n--- FINAL ORDER BOOKS ---");
+        for instrument in instruments {
+            if let Some(display) = engine.get_order_book_display(instrument) {
+                println!("\n--- ORDER BOOK: {} ---", instrument);
+                
+                println!("  ASKS (Sell Orders):");
+                if display.asks.is_empty() {
+                    println!("    (empty)");
+                } else {
+                    for level in display.asks.iter().rev() {
+                        println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
+                    }
+                }
+                
+                println!("  ---------------------------");
 
-    let datetime: DateTime<Local> = utc_dt.with_timezone(&Local);
-
-    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
-}
+                println!("  BIDS (Buy Orders):");
+                if display.bids.is_empty() {
+                    println!("    (empty)");
+                } else {
+                    for level in &display.bids {
+                        println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
+                    }
+                }
+                println!("-----------------------------");
+            }
+        }
+    }

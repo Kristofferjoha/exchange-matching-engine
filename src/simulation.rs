@@ -5,11 +5,13 @@ use std::error::Error;
 use uuid::Uuid;
 use crate::logging::utils::SimLogger;
 use crate::utils::Operation;
+use std::time::Instant;
 
 pub fn run_simulation(
     logger: &mut Box<dyn SimLogger>,
     engine: &mut MatchingEngine,
     operations: &[Operation],
+    latencies: &mut Vec<u128>,
 ) -> Result<(), Box<dyn Error>> {
     for operation in operations {
         match operation.operation.as_str() {
@@ -61,8 +63,10 @@ pub fn run_simulation(
 
                 logger.log_order_submission(&order);
 
+                let op_start = Instant::now();
                 match engine.process_order(order, logger) {
                     Ok(_) => {
+                        latencies.push(op_start.elapsed().as_nanos());
                     }
                     Err(e) => eprintln!(" -> Error processing order: {}", e),
                 }

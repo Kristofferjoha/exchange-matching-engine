@@ -92,12 +92,14 @@ pub fn display_final_matching_engine(instruments: &[String], engine: &MatchingEn
 
 pub fn load_operations(path: &str) -> Result<Vec<Operation>, Box<dyn Error>> {
     let mut reader = csv::Reader::from_path(path)?;
-    let mut ops = Vec::new();
+    
+    const EXPECTED_RECORDS: usize = 100_000; 
+    let mut ops = Vec::with_capacity(EXPECTED_RECORDS);
 
     for result in reader.deserialize() {
-        let op: Operation = result?;
-        ops.push(op);
+        ops.push(result?);
     }
+    
     Ok(ops)
 }
     

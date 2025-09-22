@@ -8,14 +8,15 @@ use std::str::FromStr;
 mod logging;
 use logging::utils::{LoggingMode, create_logger};
 use engine::MatchingEngine;
+use std::time::Instant;
 
-use utils::display_final_matching_engine;
+use utils::{display_final_matching_engine, load_operations};
 
 use simulation::run_simulation;
 
 
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let mode_str = args.get(1).expect("Usage: cargo run <logging_mode>");
     let mode = LoggingMode::from_str(mode_str).expect("Invalid logging mode");
@@ -31,11 +32,16 @@ fn main() {
         println!("  - Market created for {}", instrument);
     }
 
-    if let Err(e) = run_simulation(&mut logger, &mut engine) {
+    let operations = load_operations("operations.csv")?;
+
+    let start = Instant::now();
+    if let Err(e) = run_simulation(&mut logger, &mut engine, &operations) {
         eprintln!("Application error: {}", e);
     }
-
-    display_final_matching_engine(&instruments,&engine);
+    display_final_matching_engine(&instruments, &engine);
+    println!("Simulation completed in {:.2?}", start.elapsed());
 
     logger.finalize();
+
+    Ok(())
 }

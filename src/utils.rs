@@ -1,6 +1,8 @@
 use rust_decimal::Decimal;
 use thiserror::Error;
 use crate::engine::MatchingEngine;
+use serde::Deserialize;
+use std::error::Error;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +23,17 @@ pub enum OrderStatus {
     PartiallyFilled,
     Filled,
     Canceled,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Operation {
+    pub operation: String,
+    pub instrument: String,
+    pub side: Option<String>,
+    pub order_type: Option<String>,
+    pub quantity: Option<Decimal>,
+    pub price: Option<Decimal>,
+    pub order_to_cancel: Option<String>,
 }
 
 #[derive(Error, Debug)]
@@ -46,6 +59,7 @@ pub struct OrderBookDisplay {
 }
 
 pub fn display_final_matching_engine(instruments: &[String], engine: &MatchingEngine) {
+
     println!("\n--- FINAL ORDER BOOKS ---");
         for instrument in instruments {
             if let Some(display) = engine.get_order_book_display(instrument) {
@@ -74,3 +88,16 @@ pub fn display_final_matching_engine(instruments: &[String], engine: &MatchingEn
             }
         }
     }
+
+
+pub fn load_operations(path: &str) -> Result<Vec<Operation>, Box<dyn Error>> {
+    let mut reader = csv::Reader::from_path(path)?;
+    let mut ops = Vec::new();
+
+    for result in reader.deserialize() {
+        let op: Operation = result?;
+        ops.push(op);
+    }
+    Ok(ops)
+}
+    

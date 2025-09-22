@@ -1,31 +1,17 @@
 use crate::engine::{MatchingEngine};
 use crate::order::Order;
-use crate::utils::{Side};
-use rust_decimal::Decimal;
-use serde::Deserialize;
+use crate::utils::Side;
 use std::error::Error;
 use uuid::Uuid;
 use crate::logging::utils::SimLogger;
+use crate::utils::Operation;
 
-
-
-#[derive(Debug, Deserialize)]
-struct Operation {
-    operation: String,
-    instrument: String,
-    side: Option<String>,
-    order_type: Option<String>,
-    quantity: Option<Decimal>,
-    price: Option<Decimal>,
-    order_to_cancel: Option<String>,
-}
-
-pub fn run_simulation(logger: &mut Box<dyn SimLogger>, engine: &mut MatchingEngine) -> Result<(), Box<dyn Error>> {
-    let mut reader = csv::Reader::from_path("operations.csv")?;
-
-    for result in reader.deserialize() {
-        let operation: Operation = result?;
-
+pub fn run_simulation(
+    logger: &mut Box<dyn SimLogger>,
+    engine: &mut MatchingEngine,
+    operations: &[Operation],
+) -> Result<(), Box<dyn Error>> {
+    for operation in operations {
         match operation.operation.as_str() {
             "NEW" => {
                 let Some(id_str) = operation.order_to_cancel.as_ref() else {

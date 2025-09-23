@@ -6,11 +6,12 @@ mod simulation;
 mod utils;
 use std::str::FromStr;
 mod logging;
-use logging::utils::{LoggingMode, create_logger};
+use logging::types::LoggingMode;
+use crate::logging::create_logger;
 use engine::MatchingEngine;
 use std::time::Instant;
 
-use utils::{display_final_matching_engine, load_operations};
+use utils::{display_final_matching_engine, load_operations, report_latencies};
 
 use simulation::run_simulation;
 
@@ -42,24 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     display_final_matching_engine(&instruments, &engine);
     println!("Simulation completed in {:.2?}", start.elapsed());
 
-    if !latencies.is_empty() {
-        latencies.sort_unstable();
-
-        let count = latencies.len();
-        let sum: u128 = latencies.iter().sum();
-        let mean = sum / count as u128;
-        let median = latencies[count / 2];
-        let p99 = latencies[(count as f64 * 0.99) as usize];
-        let p999 = latencies[(count as f64 * 0.999) as usize];
-
-        println!("\n--- Latency Distribution (nanoseconds) ---");
-        println!("          Count: {}", count);
-        println!("           Mean: {}", mean);
-        println!("         Median: {}", median);
-        println!("  99th Percentile: {}", p99);
-        println!("99.9th Percentile: {}", p999);
-        println!("------------------------------------------");
-    }
+    report_latencies(&mut latencies);
 
 
     logger.finalize();

@@ -4,7 +4,7 @@ use crate::trade::Trade;
 use crate::utils::{MatchingEngineError, OrderBookDisplay, OrderType};
 use std::collections::HashMap;
 use uuid::Uuid;
-use crate::logging::utils::SimLogger;
+use crate::logging::logger_trait::SimLogger;
 
 pub struct MatchingEngine {
     books: HashMap<String, OrderBook>,
@@ -58,7 +58,6 @@ impl MatchingEngine {
         self.books.contains_key(instrument)
     }
 
-
     pub fn cancel_order_by_id(&mut self, order_id: &Uuid, instrument: &str) -> Result<Order, MatchingEngineError> {
         if let Some(book) = self.books.get_mut(instrument) {
             book.cancel_order(order_id)
@@ -75,7 +74,8 @@ impl MatchingEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logging::utils::{create_logger, LoggingMode};
+    use crate::logging::types::LoggingMode;
+    use crate::logging::create_logger;
     use crate::order::{Order};
     use crate::utils::{Side, OrderType};
     use crate::utils::MatchingEngineError;

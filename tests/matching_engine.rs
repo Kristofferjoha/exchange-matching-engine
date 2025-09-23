@@ -1,12 +1,11 @@
-// To use items from your library, you need to import them this way in an integration test
 use exchange_matching_engine::engine::MatchingEngine;
-use exchange_matching_engine::logging::utils::{create_logger, LoggingMode};
+use exchange_matching_engine::logging::create_logger;
+use exchange_matching_engine::logging::types::LoggingMode;
 use exchange_matching_engine::order::Order;
 use exchange_matching_engine::utils::{MatchingEngineError, Side};
 use rust_decimal_macros::dec;
 use uuid::Uuid;
 
-// Helper function to set up the engine for tests
 fn setup() -> MatchingEngine {
     let mut engine = MatchingEngine::new();
     engine.add_market("SOFI".to_string());
@@ -17,10 +16,8 @@ fn setup() -> MatchingEngine {
 fn test_add_non_matching_limit_order() {
     let mut engine = setup();
     let order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(100.0), dec!(10));
-    // Create a logger for the test
     let mut logger = create_logger(LoggingMode::Baseline);
 
-    // Pass the logger to process_order
     let trades = engine.process_order(order, &mut logger).unwrap();
     assert!(trades.is_empty());
 
@@ -83,7 +80,6 @@ fn test_match_across_multiple_price_levels() {
     let trades = engine.process_order(buy_order, &mut logger).unwrap();
 
     assert_eq!(trades.len(), 2);
-    // Note: The engine should match the best price (lowest sell price) first.
     assert_eq!(trades[0].price, dec!(101.0));
     assert_eq!(trades[0].quantity, dec!(5));
     assert_eq!(trades[1].price, dec!(102.0));

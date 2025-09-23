@@ -3,7 +3,7 @@ use crate::order::Order;
 use crate::utils::Side;
 use std::error::Error;
 use uuid::Uuid;
-use crate::logging::utils::SimLogger;
+use crate::logging::logger_trait::SimLogger;
 use crate::utils::Operation;
 use std::time::Instant;
 

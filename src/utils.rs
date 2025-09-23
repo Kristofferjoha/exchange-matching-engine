@@ -103,3 +103,25 @@ pub fn load_operations(path: &str) -> Result<Vec<Operation>, Box<dyn Error>> {
     Ok(ops)
 }
     
+pub fn report_latencies(latencies: &mut Vec<u128>) {
+    if latencies.is_empty() {
+        return;
+    }
+
+    latencies.sort_unstable();
+
+    let count = latencies.len();
+    let sum: u128 = latencies.iter().sum();
+    let mean = sum / count as u128;
+    let median = latencies[count / 2];
+    let p99 = latencies[(count as f64 * 0.99) as usize];
+    let p999 = latencies[(count as f64 * 0.999) as usize];
+
+    println!("\n--- Latency Distribution (nanoseconds) ---");
+    println!("          Count: {}", count);
+    println!("           Mean: {}", mean);
+    println!("         Median: {}", median);
+    println!("  99th Percentile: {}", p99);
+    println!("99.9th Percentile: {}", p999);
+    println!("------------------------------------------");
+}

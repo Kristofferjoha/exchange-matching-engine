@@ -26,7 +26,6 @@ impl AsyncEnumLogger {
             if let Ok(file) = File::create(&path_owned) {
                 let mut writer = BufWriter::new(file);
 
-                // The logging thread receives the enum and does all the formatting.
                 for msg in receiver.iter() {
                     match msg {
                         LogMessage::OrderSubmission(order) => {
@@ -62,8 +61,6 @@ impl AsyncEnumLogger {
 }
 
 impl SimLogger for AsyncEnumLogger {
-    // The log methods now create a lightweight enum variant and send it.
-    // This is extremely fast as it avoids heap allocation (`Box`).
     fn log_order_submission(&mut self, order: &Order) {
         let _ = self
             .sender

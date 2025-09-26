@@ -1,13 +1,49 @@
-# Order-Book-Matching-Engine
+# Order Book Matching Engine
+A high-performance order book matching engine written in Rust, designed specifically to benchmark and quantify the performance overhead of various low-latency logging strategies in High-Frequency Trading (HFT) systems.
 
-A high-performance Rust matching engine for benchmarking low-latency logging strategies in HFT systems.
+# Overview
+In latency-sensitive domains like HFT, every microsecond counts. While logging is crucial for debugging, auditing, and compliance, it is fundamentally an I/O-bound operation that can introduce significant, unpredictable latency spikes on the critical path.
 
-The engine processes a sequence of limit and market orders from a CSV file, maintains a Level 2 order book for each instrument, and generates trades upon matching. The core of the project is a detailed benchmark of seven distinct logging implementations, from naive, blocking methods to highly optimized asynchronous patterns.
+This project provides a realistic simulation of a matching engine to serve as a testbed for different logging approaches. It demonstrates empirically how choosing the right logging strategy is not a minor detail but a critical architectural decision for any high-performance application.
 
-The simulation was run against a set of 100,000 operations. The following latencies were measured for each "NEW" order operation on the critical path (engine.process_order). The table is ordered from the best-performing to the worst-performing logging strategy, with the Baseline included for reference.
+# The Logging Benchmark
+The primary goal of this project is to measure the precise latency impact of different logging implementations on the application's critical path.
+
+### Example Log Output
+The engine produces structured logs that clearly detail every event. Here is a sample:
+
+2025-09-26 16:05:19.541 | ORDER RECEIVED: id=3f74a20a-ce66-4796-8c78-7d1aec6491c9, instrument=PUMPTHIS, side=Buy, type=Limit, qty=67, price=99.25
+2025-09-26 16:05:19.889 | ORDER RECEIVED: id=198738b4-c21b-48bc-9b54-74eb0e5e2600, instrument=PUMPTHIS, side=Buy, type=Limit, qty=22, price=98.75
+2025-09-26 16:05:19.952 | ORDER RECEIVED: id=f8231017-8af3-474e-bc2a-a9db017ef446, instrument=PUMPTHIS, side=Buy, type=Limit, qty=50, price=98.50
+2025-09-26 16:05:20.103 | ORDER RECEIVED: id=7bc076c5-1929-49e7-9386-8dc01dd64c91, instrument=PUMPTHIS, side=Sell, type=Limit, qty=89, price=98.7
+2025-09-26 16:05:20.103 | TRADE EXECUTED: id=9ad5e9c4-3219-4f3f-a752-3feaee8f5426, instrument=PUMPTHIS, price=99.25, qty=67, taker_side=Sell, buy_order_id=3f74a20a-ce66-4796-8c78-7d1aec6491c9, sell_order_id=7bc076c5-1929-49e7-9386-8dc01dd64c91
+2025-09-26 16:05:20.103 | TRADE EXECUTED: id=74427a2c-28ad-49ff-85c2-ed63a95e1d2f, instrument=PUMPTHIS, price=98.75, qty=22, taker_side=Sell, buy_order_id=198738b4-c21b-48bc-9b54-74eb0e5e2600, sell_order_id=7bc076c5-1929-49e7-9386-8dc01dd64c91
+2025-09-26 16:05:20.103 | ORDER FILLED: id=3f74a20a-ce66-4796-8c78-7d1aec6491c9, instrument=PUMPTHIS, type=Limit, final_status=Filled, quantity=67, quantity_filled=67
+2025-09-26 16:05:20.103 | ORDER FILLED: id=7bc076c5-1929-49e7-9386-8dc01dd64c91, instrument=PUMPTHIS, type=Limit, final_status=Filled, quantity=89, quantity_filled=89
+2025-09-26 16:05:20.104 | ORDER RECEIVED: id=f689ec92-783d-4575-84f2-dbbf711b3e81, instrument=PUMPTHIS, side=Sell, type=Limit, qty=7, price=99.6
+2025-09-26 16:05:20.104 | ORDER CANCEL: id=f8231017-8af3-474e-bc2a-a9db017ef446 successfully cancelled
+
+## Strategies Tested
+Seven distinct logging methods were benchmarked against a no-op baseline.
+
+| Logging Mode | Description | 
+| ----- | ----- | 
+| `none` (Baseline) | No logging is performed. This measures the raw performance of the matching engine. | 
+| `ae` (Async Enum) | Sends a lightweight enum variant over an MPSC channel to a dedicated logging thread for processing. | 
+| `ac` (Async Closure) | Sends a closure over a channel to a logger thread, deferring all processing. | 
+| `bfw` (Buffered) | A synchronous file writer wrapped in a std::io::BufWriter to reduce syscalls. | 
+| `as` (Async String) | Formats a string on the critical path and sends it over a channel to a logger thread. | 
+| `nfw` (Naive File) | A synchronous, unbuffered file write performed directly on the critical path for every event. | 
+| `naive` (println!) | The simplest approach: blocking writes to standard output, which is notoriously slow. | 
+
+## Methodology
+Test Load: The simulation was run against a sequence of 100,000 order operations.
+
+Critical Path: Latency was measured exclusively for the engine.process_order function call.
+
+Environment: All benchmarks were compiled and run in release mode (cargo run --release) to enable full compiler optimizations.
 
 ## Results
-All benchmarks were run in release mode (cargo run --release <mode>) for accurate results.
 
 | Logging Mode | Total Time | Mean Latency  | Median Latency | p99 Latency | p99.9 Latency | 
 | ----- | ----- | ----- | ----- | ----- | ----- | 

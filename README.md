@@ -12,6 +12,7 @@ The primary goal of this project is to measure the precise latency impact of dif
 ### Example Log Output
 The engine produces structured logs that clearly detail every event. Here is a sample:
 
+```text
 2025-09-26 16:05:19.541 | ORDER RECEIVED: id=3f74a20a-ce66-4796-8c78-7d1aec6491c9, instrument=PUMPTHIS, side=Buy, type=Limit, qty=67, price=99.25
 2025-09-26 16:05:19.889 | ORDER RECEIVED: id=198738b4-c21b-48bc-9b54-74eb0e5e2600, instrument=PUMPTHIS, side=Buy, type=Limit, qty=22, price=98.75
 2025-09-26 16:05:19.952 | ORDER RECEIVED: id=f8231017-8af3-474e-bc2a-a9db017ef446, instrument=PUMPTHIS, side=Buy, type=Limit, qty=50, price=98.50
@@ -22,6 +23,7 @@ The engine produces structured logs that clearly detail every event. Here is a s
 2025-09-26 16:05:20.103 | ORDER FILLED: id=7bc076c5-1929-49e7-9386-8dc01dd64c91, instrument=PUMPTHIS, type=Limit, final_status=Filled, quantity=89, quantity_filled=89
 2025-09-26 16:05:20.104 | ORDER RECEIVED: id=f689ec92-783d-4575-84f2-dbbf711b3e81, instrument=PUMPTHIS, side=Sell, type=Limit, qty=7, price=99.6
 2025-09-26 16:05:20.104 | ORDER CANCEL: id=f8231017-8af3-474e-bc2a-a9db017ef446 successfully cancelled
+```
 
 ## Strategies Tested
 Seven distinct logging methods were benchmarked against a no-op baseline.

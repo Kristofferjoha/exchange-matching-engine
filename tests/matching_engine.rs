@@ -18,7 +18,7 @@ fn test_add_non_matching_limit_order() {
     let order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(100.0), dec!(10));
     let mut logger = create_logger(LoggingMode::Baseline);
 
-    let trades = engine.process_order(order, &mut logger).unwrap();
+    let (trades, _log_duration) = engine.process_order(order, &mut logger).unwrap();
     assert!(trades.is_empty());
 
     let book = engine.get_order_book_display("SOFI").unwrap();
@@ -37,7 +37,7 @@ fn test_simple_full_match() {
     engine.process_order(sell_order, &mut logger).unwrap();
 
     let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(102.5), dec!(5));
-    let trades = engine.process_order(buy_order, &mut logger).unwrap();
+    let (trades, _log_duration) = engine.process_order(buy_order, &mut logger).unwrap();
 
     assert_eq!(trades.len(), 1);
     assert_eq!(trades[0].price, dec!(102.5));
@@ -57,7 +57,7 @@ fn test_partial_match() {
     engine.process_order(sell_order, &mut logger).unwrap();
 
     let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(200.0), dec!(3));
-    let trades = engine.process_order(buy_order, &mut logger).unwrap();
+    let (trades, _log_duration) = engine.process_order(buy_order, &mut logger).unwrap();
 
     assert_eq!(trades.len(), 1);
     assert_eq!(trades[0].quantity, dec!(3));
@@ -77,7 +77,7 @@ fn test_match_across_multiple_price_levels() {
     engine.process_order(Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(101.0), dec!(5)), &mut logger).unwrap();
 
     let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(103.0), dec!(12));
-    let trades = engine.process_order(buy_order, &mut logger).unwrap();
+    let (trades, _log_duration) = engine.process_order(buy_order, &mut logger).unwrap();
 
     assert_eq!(trades.len(), 2);
     assert_eq!(trades[0].price, dec!(101.0));
@@ -105,7 +105,7 @@ fn test_price_time_priority_fifo() {
     engine.process_order(sell_order_second, &mut logger).unwrap();
 
     let buy_order = Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(100.0), dec!(5));
-    let trades = engine.process_order(buy_order, &mut logger).unwrap();
+    let (trades, _log_duration) = engine.process_order(buy_order, &mut logger).unwrap();
 
     assert_eq!(trades.len(), 1);
     assert_eq!(trades[0].sell_order_id, first_order_id);
@@ -153,7 +153,7 @@ fn test_market_order_insufficient_liquidity() {
     engine.process_order(Order::new_limit(Uuid::new_v4(), "SOFI".to_string(), Side::Sell, dec!(100.0), dec!(5)), &mut logger).unwrap();
 
     let market_buy = Order::new_market(Uuid::new_v4(), "SOFI".to_string(), Side::Buy, dec!(10));
-    let trades = engine.process_order(market_buy, &mut logger).unwrap();
+    let (trades, _log_duration) = engine.process_order(market_buy, &mut logger).unwrap();
     
     assert_eq!(trades.len(), 1);
     assert_eq!(trades[0].quantity, dec!(5));

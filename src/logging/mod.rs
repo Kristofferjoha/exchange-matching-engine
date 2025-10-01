@@ -8,7 +8,7 @@ pub use types::LoggingMode;
 
 use log_methods::{
     AsyncClosureLogger, AsyncEnumLogger, AsyncStringLogger, BufferedFileWriteLogger,
-    NaiveFileWriteLogger, NoOpLogger, PrintlnLogger,
+    NaiveFileWriteLogger, NoOpLogger, PrintlnLogger, TracingLogger
 };
 use std::path::Path;
 
@@ -38,6 +38,41 @@ pub fn create_logger(mode: LoggingMode) -> Box<dyn SimLogger> {
         LoggingMode::AsyncEnum => {
             let path = Path::new(OUTPUT_DIR).join("async_enum_output.log");
             Box::new(AsyncEnumLogger::new(path.to_str().unwrap()))
+        }
+
+        LoggingMode::TracingFile => {
+            let log_file = Path::new(OUTPUT_DIR).join("tracing_output.log");
+            let file_appender = tracing_appender::rolling::never("", log_file);
+            let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(non_blocking)
+                .with_ansi(false)
+                .without_time()
+                .with_target(false)
+                .with_level(false)
+                .compact()
+                .finish();
+            
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Unable to set global tracing subscriber");
+
+            Box::new(TracingLogger::new(Some(guard)))
+        }
+
+        LoggingMode::TracingConsole => {
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(std::io::stdout)
+                .without_time()
+                .with_target(false)
+                .with_level(false)
+                .compact()
+                .finish();
+            
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Unable to set global tracing subscriber");
+            
+            Box::new(TracingLogger::new(None))
         }
     }
 }

@@ -11,7 +11,7 @@ pub fn run_simulation(
     logger: &mut Box<dyn SimLogger>,
     engine: &mut MatchingEngine,
     operations: &[Operation],
-    latencies: &mut Vec<u128>,
+    latencies: &mut Vec<(u128, u128)>,
 ) -> Result<(), Box<dyn Error>> {
     for operation in operations {
         match operation.operation.as_str() {
@@ -61,14 +61,20 @@ pub fn run_simulation(
                     }
                 };
 
+                let log_submission_start = Instant::now();
                 logger.log_order_submission(&order);
+                let log_submission_duration = log_submission_start.elapsed().as_nanos();
 
                 let op_start = Instant::now();
                 match engine.process_order(order, logger) {
-                    Ok(_) => {
-                        latencies.push(op_start.elapsed().as_nanos());
+                    Ok((_, log_process_duration)) => {
+                        let process_duration = op_start.elapsed().as_nanos();
+                        latencies.push((process_duration, log_submission_duration + log_process_duration));
                     }
-                    Err(e) => eprintln!(" -> Error processing order: {}", e),
+                    Err(e) => {
+                        eprintln!(" -> Error processing order: {}", e);
+                        latencies.push((op_start.elapsed().as_nanos(), log_submission_duration));
+                    }
                 }
             }
             "CANCEL" => {
@@ -82,9 +88,15 @@ pub fn run_simulation(
                     continue;
                 };
 
+                let cancel_start = Instant::now();
                 let success = engine.cancel_order_by_id(&order_id, &operation.instrument).is_ok();
+                let process_duration = cancel_start.elapsed().as_nanos();
                 
+                let log_cancel_start = Instant::now();
                 logger.log_order_cancel(&order_id, success);
+                let log_cancel_duration = log_cancel_start.elapsed().as_nanos();
+
+                latencies.push((process_duration, log_cancel_duration));
             }
             _ => {
                 eprintln!(" -> Error: Unknown operation type '{}'", operation.operation);

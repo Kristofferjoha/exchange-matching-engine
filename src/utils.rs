@@ -4,7 +4,6 @@ use crate::engine::MatchingEngine;
 use serde::Deserialize;
 use std::error::Error;
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
     Buy,
@@ -59,36 +58,34 @@ pub struct OrderBookDisplay {
 }
 
 pub fn display_final_matching_engine(instruments: &[String], engine: &MatchingEngine) {
-
     println!("\n--- FINAL ORDER BOOKS ---");
-        for instrument in instruments {
-            if let Some(display) = engine.get_order_book_display(instrument) {
-                println!("\n--- ORDER BOOK: {} ---", instrument);
-                
-                println!("  ASKS (Sell Orders):");
-                if display.asks.is_empty() {
-                    println!("    (empty)");
-                } else {
-                    for level in display.asks.iter().rev() {
-                        println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
-                    }
+    for instrument in instruments {
+        if let Some(display) = engine.get_order_book_display(instrument) {
+            println!("\n--- ORDER BOOK: {} ---", instrument);
+            
+            println!("  ASKS (Sell Orders):");
+            if display.asks.is_empty() {
+                println!("    (empty)");
+            } else {
+                for level in display.asks.iter().rev() {
+                    println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
                 }
-                
-                println!("  ---------------------------");
-
-                println!("  BIDS (Buy Orders):");
-                if display.bids.is_empty() {
-                    println!("    (empty)");
-                } else {
-                    for level in &display.bids {
-                        println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
-                    }
-                }
-                println!("-----------------------------");
             }
+            
+            println!("  ---------------------------");
+
+            println!("  BIDS (Buy Orders):");
+            if display.bids.is_empty() {
+                println!("    (empty)");
+            } else {
+                for level in &display.bids {
+                    println!("    Price: {:<10} | Volume: {}", level.price.round_dp(2), level.volume);
+                }
+            }
+            println!("-----------------------------");
         }
     }
-
+}
 
 pub fn load_operations(path: &str) -> Result<Vec<Operation>, Box<dyn Error>> {
     let mut reader = csv::Reader::from_path(path)?;
@@ -102,26 +99,43 @@ pub fn load_operations(path: &str) -> Result<Vec<Operation>, Box<dyn Error>> {
     
     Ok(ops)
 }
-    
-pub fn report_latencies(latencies: &mut Vec<u128>) {
+
+pub fn report_latencies(latencies: &[(u128, u128)]) {
     if latencies.is_empty() {
+        println!("No latencies recorded.");
         return;
     }
 
-    latencies.sort_unstable();
+    let mut process_latencies: Vec<u128> = latencies.iter().map(|(p, _)| *p).collect();
+    let mut log_latencies: Vec<u128> = latencies.iter().map(|(_, l)| *l).collect();
 
-    let count = latencies.len();
-    let sum: u128 = latencies.iter().sum();
-    let mean = sum / count as u128;
-    let median = latencies[count / 2];
-    let p99 = latencies[(count as f64 * 0.99) as usize];
-    let p999 = latencies[(count as f64 * 0.999) as usize];
+    process_latencies.sort_unstable();
+    log_latencies.sort_unstable();
+
+    let count = process_latencies.len();
+    let process_sum: u128 = process_latencies.iter().sum();
+    let log_sum: u128 = log_latencies.iter().sum();
+    let process_mean = process_sum as f64 / count as f64;
+    let log_mean = log_sum as f64 / count as f64;
+    let process_median = process_latencies[count / 2];
+    let log_median = log_latencies[count / 2];
+    let process_p99 = process_latencies[((count as f64 * 0.99).ceil() as usize).min(count - 1)];
+    let log_p99 = log_latencies[((count as f64 * 0.99).ceil() as usize).min(count - 1)];
+    let process_p999 = process_latencies[((count as f64 * 0.999).ceil() as usize).min(count - 1)];
+    let log_p999 = log_latencies[((count as f64 * 0.999).ceil() as usize).min(count - 1)];
 
     println!("\n--- Latency Distribution (nanoseconds) ---");
-    println!("          Count: {}", count);
-    println!("           Mean: {}", mean);
-    println!("         Median: {}", median);
-    println!("  99th Percentile: {}", p99);
-    println!("99.9th Percentile: {}", p999);
+    println!("Processing:");
+    println!("{:<25} {}", "Count:", count);
+    println!("{:<25} {:.2}", "Mean:", process_mean);
+    println!("{:<25} {}", "Median:", process_median);
+    println!("{:<25} {}", "99th Percentile:", process_p99);
+    println!("{:<25} {}", "99.9th Percentile:", process_p999);
+    println!("Logging:");
+    println!("{:<25} {}", "Count:", count);
+    println!("{:<25} {:.2}", "Mean:", log_mean);
+    println!("{:<25} {}", "Median:", log_median);
+    println!("{:<25} {}", "99th Percentile:", log_p99);
+    println!("{:<25} {}", "99.9th Percentile:", log_p999);
     println!("------------------------------------------");
 }

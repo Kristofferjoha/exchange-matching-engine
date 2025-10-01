@@ -5,6 +5,7 @@ use crate::utils::{MatchingEngineError, OrderBookDisplay, OrderType};
 use std::collections::HashMap;
 use uuid::Uuid;
 use crate::logging::logger_trait::SimLogger;
+use std::time::Instant;
 
 pub struct MatchingEngine {
     books: HashMap<String, OrderBook>,
@@ -21,7 +22,7 @@ impl MatchingEngine {
         self.books.insert(instrument.clone(), OrderBook::new(instrument));
     }
 
-    pub fn process_order(&mut self, order: Order, logger: &mut Box<dyn SimLogger>) -> Result<Vec<Trade>, MatchingEngineError> {
+    pub fn process_order(&mut self, order: Order, logger: &mut Box<dyn SimLogger>) -> Result<(Vec<Trade>, u128), MatchingEngineError> {
         match order.order_type {
             OrderType::Market if order.price.is_some() => {
                 return Err(MatchingEngineError::InvalidOrderPrice)
@@ -36,26 +37,22 @@ impl MatchingEngine {
             Some(book) => {
                 let (trades, filled_orders, final_incoming_state) = book.add_order(order);
 
+                let log_start = Instant::now();
                 for trade in &trades {
                     logger.log_trade(trade);
                 }
-
                 for filled_order in filled_orders {
                     logger.log_order_filled(&filled_order);
                 }
-
                 if final_incoming_state.is_filled() || final_incoming_state.order_type == OrderType::Market {
                     logger.log_order_filled(&final_incoming_state);
                 }
+                let log_duration = log_start.elapsed().as_nanos();
 
-                Ok(trades)
+                Ok((trades, log_duration))
             }
             None => Err(MatchingEngineError::MarketNotFound(order.instrument)),
         }
-    }
-
-    pub fn has_market(&self, instrument: &str) -> bool {
-        self.books.contains_key(instrument)
     }
 
     pub fn cancel_order_by_id(&mut self, order_id: &Uuid, instrument: &str) -> Result<Order, MatchingEngineError> {
@@ -82,14 +79,7 @@ mod tests {
     use rust_decimal_macros::dec;
     use uuid::Uuid;
 
-    #[test]
-    fn test_add_and_has_market() {
-        let mut engine = MatchingEngine::new();
-        assert!(!engine.has_market("SOFI"));
-        
-        engine.add_market("SOFI".to_string());
-        assert!(engine.has_market("SOFI"));
-    }
+
 
     #[test]
     fn test_process_order_for_non_existent_market() {

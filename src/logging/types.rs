@@ -12,6 +12,8 @@ pub enum LoggingMode {
     AsyncString,
     AsyncClosure,
     AsyncEnum,
+    TracingConsole,
+    TracingFile,
 }
 
 impl FromStr for LoggingMode {
@@ -22,6 +24,8 @@ impl FromStr for LoggingMode {
             "println" | "naive" => Ok(Self::Naive),
             "naivefilewrite" | "nfw" => Ok(Self::NaiveFileWrite),
             "bufferedfilewrite" | "bfw" => Ok(Self::BufferedFileWrite),
+            "tracingconsole" | "tc" => Ok(Self::TracingConsole),
+            "tracingfile" | "tf" => Ok(Self::TracingFile),
             "asyncstring" | "as" => Ok(Self::AsyncString),
             "asyncclosure" | "ac" => Ok(Self::AsyncClosure),
             "asyncenum" | "ae" => Ok(Self::AsyncEnum),

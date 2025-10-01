@@ -4,17 +4,17 @@ mod trade;
 mod order;
 mod simulation;
 mod utils;
-use std::str::FromStr;
 mod logging;
+
+use std::str::FromStr;
 use logging::types::LoggingMode;
-use crate::logging::create_logger;
 use engine::MatchingEngine;
 use std::time::Instant;
 use std::fs;
-
 use utils::{display_final_matching_engine, load_operations, report_latencies};
-
 use simulation::run_simulation;
+
+use crate::logging::create_logger;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all("output_logs")?;

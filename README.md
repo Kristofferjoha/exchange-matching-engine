@@ -26,33 +26,43 @@ The engine produces structured logs that clearly detail every event. Here is a s
 ```
 
 ## Strategies Tested
-Seven distinct logging methods were benchmarked against a no-op baseline.
+Nine distinct logging methods were benchmarked against a no-op baseline.
 
 | Logging Mode | Description | 
 | ----- | ----- | 
 | `none` (Baseline) | No logging is performed. This measures the raw performance of the matching engine. | 
-| `ae` (Async Enum) | Sends a lightweight enum variant over an MPSC channel to a dedicated logging thread for processing. | 
-| `ac` (Async Closure) | Sends a closure over a channel to a logger thread, deferring all processing. | 
-| `bfw` (Buffered) | A synchronous file writer wrapped in a std::io::BufWriter to reduce syscalls. | 
-| `as` (Async String) | Formats a string on the critical path and sends it over a channel to a logger thread. | 
-| `nfw` (Naive File) | A synchronous, unbuffered file write performed directly on the critical path for every event. | 
+| `ae` (Async Enum) | Sends a lightweight enum variant over an MPSC channel to a dedicated logging thread for processing, minimizing critical path overhead. | 
+| `ac` (Async Closure) | Sends a closure over a channel to a logger thread, deferring all processing for low latency. | 
+| `bfw` (Buffered) | A synchronous file writer wrapped in a std::io::BufWriter to reduce syscalls, balancing latency and persistence | 
+| `as` (Async String) | Formats a string on the critical path and sends it over a channel to a logger thread, suitable for structured logging with moderate overhead. | 
+| `nfw` (Naive File) | A synchronous, unbuffered file write performed directly on the critical path, high latency but persistent. | 
+| `tf` (Tracing File) | Uses the tracing crate with a non-blocking file appender to log events to a file, high overhead but structured. | 
+| `tc` (Tracing Console) | Uses the tracing crate to log events to stdout with structured formatting, high overhead. | 
 | `naive` (println!) | The simplest approach: blocking writes to standard output, which is notoriously slow. | 
 
 ## Methodology
-Test Load: The simulation was run against a sequence of 100,000 order operations.
+Test Load: The simulation was run against a sequence of 1000000 order operations (NEW and CANCEL) from operations.csv, averaged over 10 runs per logging mode.
 
-Critical Path: Latency was measured exclusively for the engine.process_order function call.
+Critical Path: Latency was measured for both processing (engine.process_order, cancel_order_by_id) and logging operations, with a focus on logging latency to evaluate overhead.
 
-Environment: All benchmarks were compiled and run in release mode (cargo run --release) to enable full compiler optimizations.
+Metrics: Mean, median, 99th percentile (P99), and 99.9th percentile (P999) latencies were calculated for logging operations. Total time is the average runtime across 10 runs for 1000000 operations, including processing, logging, and overheads.
+
+To run the simulation, use cargo run --release and then logging version you want to use, fx "ae"
 
 ## Results
 
-| Logging Mode | Total Time | Mean Latency  | Median Latency | p99 Latency | p99.9 Latency | 
-| ----- | ----- | ----- | ----- | ----- | ----- | 
-| `none` (Baseline) | 49.37 ms | 476 ns | 200 ns | 2800 ns | 4700 ns | 
-| `ae` (Async Enum) | 66.56 ms | 620 ns | 200 ns | 3900 ns| 9200 ns | 
-| `ac` (Async Closure) | 72.21 ms | 667 ns | 200 ns | 4100 ns | 15000 ns | 
-| `bfw` (Buffered) | 179.25 ms | 1501 ns | 200 ns | 12300 ns | 39600 ns | 
-| `as` (Async String) | 208.50 ms | 1668 ns | 200 ns | 12400 ns | 18500 ns | 
-| `nfw` (Naive File) | 4.58 s | 37184 ns | 300 ns | 304500 ns | 453300 ns | 
-| `naive` (println!) | 11.09 s | 81673 ns | 1000 ns | 678000 ns | 941900 ns | 
+Certainly. Here is the table in that specific format.
+
+Of course, here is the data formatted as a Markdown table.
+
+| Logging Mode | Total Time | Mean Latency | Median Latency | p99 Latency | p99.9 Latency |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Baseline | 0.06 s | 0.046 µs | 0.000 µs | 0.200 µs | 0.300 µs |
+| AsyncEnum | 0.08 s | 0.204 µs | 0.100 µs | 1.200 µs | 3.800 µs |
+| AsyncClosure | 0.08 s | 0.236 µs | 0.100 µs | 1.300 µs | 10.700 µs |
+| BufferedFileWrite | 0.18 s | 1.246 µs | 0.400 µs | 10.000 µs | 28.900 µs |
+| AsyncString | 0.22 s | 1.625 µs | 0.800 µs | 10.700 µs | 18.400 µs |
+| NaiveFileWrite | 5.01 s | 49.273 µs | 20.600 µs | 339.500 µs | 513.300 µs |
+| TracingFile | 11.00 s | 108.242 µs | 45.500 µs | 686.500 µs | 977.800 µs |
+| TracingConsole | 11.14 s | 109.525 µs | 45.900 µs | 694.300 µs | 982.900 µs |
+| Naive | 11.52 s | 113.242 µs | 47.800 µs | 725.700 µs | 1058.400 µs |
